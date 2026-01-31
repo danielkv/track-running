@@ -14,22 +14,20 @@ export const Map = forwardRef<MapView, MapProps>((props, ref) => {
       }}
       provider="google"
       googleMapsApiKey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}
-      initialRegion={{
-        latitude: -29.107944258932047,
-        longitude: -49.63445267268351,
-        latitudeDelta: 0.001,
-        longitudeDelta: 0.001,
-      }}
-      showsUserLocation
-      showsCompass
-      showsScale
-      showsTraffic={false}
-      showsIndoors
+      showsScale={false}
       zoomEnabled
-      zoomControlEnabled
+      toolbarEnabled={false}
       rotateEnabled
       scrollEnabled
-      pitchEnabled
+      zoomControlEnabled={false}
+      showsTraffic={false}
+      pitchEnabled={false}
+      options={{
+        streetViewControl: false,
+        fullscreenControl: false,
+        cameraControl: false,
+        mapTypeControl: false,
+      }}
       loadingFallback={
         <View>
           <ActivityIndicator size="large" color="#007AFF" />

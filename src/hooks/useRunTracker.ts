@@ -15,6 +15,19 @@ export function useRunTracker() {
     setIsTracking(true);
     setPath([]);
     
+    // Get initial position immediately
+    const initialLocation = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.High,
+    });
+    
+    const initialCoord: Coordinate = {
+      latitude: initialLocation.coords.latitude,
+      longitude: initialLocation.coords.longitude,
+      timestamp: initialLocation.timestamp,
+    };
+    setCurrentLocation(initialCoord);
+    setPath([initialCoord]);
+
     subscriptionRef.current = await Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.High,
@@ -27,6 +40,7 @@ export function useRunTracker() {
           longitude: location.coords.longitude,
           timestamp: location.timestamp,
         };
+
         setCurrentLocation(coord);
         setPath((prev) => [...prev, coord]);
       }
