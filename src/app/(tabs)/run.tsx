@@ -32,7 +32,7 @@ export default function RunScreen() {
     },
     heading: 0,
     pitch: 0,
-    zoom: 15,
+    zoom: 8,
   });
 
   const { location, loading: loadingInitialLocation } = useCurrentLocation();
@@ -151,8 +151,13 @@ export default function RunScreen() {
           onRegionChangeComplete={(region) => {
             // Only update ref, don't trigger re-render
             if (cameraRef.current) {
-              cameraRef.current.center.latitude = region.latitude;
-              cameraRef.current.center.longitude = region.longitude;
+              cameraRef.current = {
+                ...cameraRef.current,
+                center: {
+                  latitude: region.latitude,
+                  longitude: region.longitude,
+                },
+              };
             }
           }}
           initialCamera={cameraRef.current}

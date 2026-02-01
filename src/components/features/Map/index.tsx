@@ -16,12 +16,12 @@ export const Map = forwardRef<MapView, MapProps>((props, ref) => {
       googleMapsApiKey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}
       showsScale={false}
       zoomEnabled
-      toolbarEnabled={false}
+      toolbarEnabled={true}
       rotateEnabled
       scrollEnabled
-      zoomControlEnabled={false}
+      zoomControlEnabled={true}
       showsTraffic={false}
-      pitchEnabled={false}
+      pitchEnabled
       options={{
         streetViewControl: false,
         fullscreenControl: false,

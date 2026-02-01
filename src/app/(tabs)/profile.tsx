@@ -13,13 +13,30 @@ WebBrowser.maybeCompleteAuthSession();
 
 import { format } from "date-fns";
 import { useTerritoryCapture } from "../../hooks/useTerritoryCapture";
+import { useAuth } from "../../hooks/useAuth";
+import { router } from "expo-router";
 
 export default function ProfileScreen() {
+  const { user, signOut } = useAuth();
   const { isAuthenticated, setStravaToken } = useAppStore();
   const { data: activities, isLoading, refetch } = useStravaActivities();
   const { mutateAsync: importActivity, isPending: isImporting } =
     useImportStravaActivity();
   const { capturedTerritories } = useTerritoryCapture();
+
+  const handleLogout = async () => {
+    Alert.alert('Sair', 'Tem certeza que deseja sair?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: async () => {
+          await signOut();
+          router.replace('/login');
+        },
+      },
+    ]);
+  };
 
   const handleConnect = async () => {
     try {
@@ -54,7 +71,22 @@ export default function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-white p-4 pt-12">
-      <Text className="text-3xl font-bold mb-6">Profile</Text>
+      <View className="flex-row justify-between items-center mb-6">
+        <View>
+          <Text className="text-3xl font-bold">Perfil</Text>
+          {user && (
+            <Text className="text-gray-600 mt-1">
+              {user.email}
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity
+          onPress={handleLogout}
+          className="bg-red-500 px-4 py-2 rounded-lg"
+        >
+          <Text className="text-white font-semibold">Sair</Text>
+        </TouchableOpacity>
+      </View>
 
       {!isAuthenticated ? (
         <TouchableOpacity
