@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useState } from 'react';
+import { LocationProvider } from '../common/provider/location';
 
 /**
  * Hook to manage location permissions.
@@ -11,7 +12,7 @@ export function useLocationPermission() {
 
   const checkPermission = useCallback(async () => {
     try {
-      const { status: currentStatus } = await Location.getForegroundPermissionsAsync();
+      const { status: currentStatus } = await LocationProvider.getForegroundPermissionsAsync();
       setStatus(currentStatus);
     } catch (error) {
       console.error('Error checking location permission:', error);
@@ -22,7 +23,7 @@ export function useLocationPermission() {
 
   const requestPermission = async () => {
     try {
-      const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
+      const { status: newStatus } = await LocationProvider.requestForegroundPermissionsAsync();
       setStatus(newStatus);
       return newStatus === Location.PermissionStatus.GRANTED;
     } catch (error) {

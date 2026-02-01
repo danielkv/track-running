@@ -1,5 +1,7 @@
-import * as Location from 'expo-location';
+
+import { LocationSubscription } from 'expo-location';
 import { useRef, useState } from 'react';
+import { LocationProvider } from '../common/provider/location';
 import { Coordinate } from '../types/Run';
 
 export function useRunTracker() {
@@ -8,13 +10,13 @@ export function useRunTracker() {
   const [currentLocation, setCurrentLocation] = useState<Coordinate | null>(null);
   const [error, setError] = useState<string | null>(null);
   
-  const subscriptionRef = useRef<Location.LocationSubscription | null>(null);
+  const subscriptionRef = useRef<LocationSubscription | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const pathRef = useRef<Coordinate[]>([]);
 
   const startTracking = async (): Promise<Coordinate | null> => {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await LocationProvider.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setError('Permissão de localização negada');
         return null;
@@ -27,8 +29,8 @@ export function useRunTracker() {
       startTimeRef.current = Date.now();
       
       // Get initial position immediately
-      const initialLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+      const initialLocation = await LocationProvider.getCurrentPositionAsync({
+        accuracy: LocationProvider.Accuracy.High,
       });
       
       const initialCoord: Coordinate = {
@@ -41,9 +43,9 @@ export function useRunTracker() {
       setPath([initialCoord]);
       pathRef.current = [initialCoord];
 
-      subscriptionRef.current = await Location.watchPositionAsync(
+      subscriptionRef.current = await LocationProvider.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.High,
+          accuracy: LocationProvider.Accuracy.High,
           timeInterval: 1000,
           distanceInterval: 5,
         },

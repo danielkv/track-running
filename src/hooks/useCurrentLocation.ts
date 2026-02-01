@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useState } from 'react';
+import { LocationProvider } from '../common/provider/location';
 import { Coordinate } from '../types/Run';
 
 /**
@@ -16,18 +17,18 @@ export function useCurrentLocation() {
     setError(null);
     try {
       // Ensure we have permission before trying to get location
-      const { status } = await Location.getForegroundPermissionsAsync();
-      
+      const { status } = await LocationProvider.getForegroundPermissionsAsync();
+
       if (status !== Location.PermissionStatus.GRANTED) {
-        const { status: requestStatus } = await Location.requestForegroundPermissionsAsync();
+        const { status: requestStatus } = await LocationProvider.requestForegroundPermissionsAsync();
         if (requestStatus !== Location.PermissionStatus.GRANTED) {
           setError('Location permission denied');
           return null;
         }
       }
 
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+      const currentLocation = await LocationProvider.getCurrentPositionAsync({
+        accuracy: LocationProvider.Accuracy.High,
         ...options,
       });
 

@@ -14,7 +14,7 @@ import React, {
   useState,
 } from "react";
 import { View } from "react-native";
-import MapView, { Camera, Polyline } from "react-native-maps";
+import MapView, { Camera, Marker, Polyline } from "react-native-maps";
 
 const ANIMATION_DURATION = 1000;
 
@@ -46,6 +46,26 @@ export default function RunScreen() {
   } = useRunTracker();
 
   const distance = useMemo(() => calculateDistance(path), [path]);
+
+  // Follow user location when following is enabled
+  useEffect(() => {
+    if (!following || !isMapReady) return;
+
+    const target = currentLocation || location;
+    if (target) {
+      mapRef.current?.animateCamera(
+        {
+          center: {
+            latitude: target.latitude,
+            longitude: target.longitude,
+          },
+        },
+        {
+          duration: 300,
+        }
+      );
+    }
+  }, [currentLocation, location, following, isMapReady]);
 
   // Update run in background
   useEffect(() => {
@@ -141,8 +161,6 @@ export default function RunScreen() {
       <View className="flex-1">
         <Map
           ref={mapRef}
-          showsUserLocation
-          followsUserLocation={following}
           showsMyLocationButton
           onMapReady={() => setIsMapReady(true)}
           onPanDrag={() => {
@@ -162,6 +180,17 @@ export default function RunScreen() {
           }}
           initialCamera={cameraRef.current}
         >
+          {/* User location marker using LocationProvider */}
+          {(currentLocation || location) && (
+            <Marker
+              coordinate={currentLocation || location}
+              anchor={{ x: 0.5, y: 0.5 }}
+              flat
+            >
+              <View className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-lg" />
+            </Marker>
+          )}
+
           {path.length > 2 && (
             <Polyline
               coordinates={path}
