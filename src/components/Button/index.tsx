@@ -2,13 +2,14 @@ import clsx from "clsx";
 import {
   PressableProps as NativePressableProps,
   Pressable,
+  Text,
 } from "react-native";
 
 interface ButtonProps extends NativePressableProps {
   className?: string;
 }
 
-export const Button = ({ className, ...props }: ButtonProps) => {
+export const Button = ({ className, children, ...props }: ButtonProps) => {
   return (
     <Pressable
       className={clsx(
@@ -16,6 +17,8 @@ export const Button = ({ className, ...props }: ButtonProps) => {
         className,
       )}
       {...props}
-    />
+    >
+      {typeof children === "string" ? <Text>{children}</Text> : children}
+    </Pressable>
   );
 };

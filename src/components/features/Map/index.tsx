@@ -12,7 +12,7 @@ export const Map = forwardRef<MapView, MapProps>((props, ref) => {
         width: "100%",
         height: "100%",
       }}
-      provider="google"
+      // provider="google"
       googleMapsApiKey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}
       showsScale={false}
       zoomEnabled

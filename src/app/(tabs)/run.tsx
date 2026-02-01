@@ -3,8 +3,16 @@ import { Map } from "@/src/components/features/Map";
 import { Text } from "@/src/components/Themed";
 import { useCurrentLocation } from "@/src/hooks/useCurrentLocation";
 import { useRunTracker } from "@/src/hooks/useRunTracker";
+import { completeRun, createRun, updateRun } from "@/src/services/routes";
+import { calculateDistance } from "@/src/utils/geo";
 import clsx from "clsx";
-import React, { useCallback, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { View } from "react-native";
 import MapView, { Camera, Polyline } from "react-native-maps";
 
@@ -12,8 +20,9 @@ const ANIMATION_DURATION = 1000;
 
 export default function RunScreen() {
   const mapRef = useRef<MapView>(null);
-  const [following, setFollowing] = React.useState(true);
-  const [isMapReady, setIsMapReady] = React.useState(false);
+  const [following, setFollowing] = useState(true);
+  const [isMapReady, setIsMapReady] = useState(false);
+  const [currentRouteId, setCurrentRouteId] = useState<string | null>(null);
 
   // Track current region in a ref to avoid re-renders and stale closures
   const cameraRef = useRef<Camera>({
@@ -27,8 +36,76 @@ export default function RunScreen() {
   });
 
   const { location, loading: loadingInitialLocation } = useCurrentLocation();
-  const { isTracking, path, startTracking, stopTracking, currentLocation } =
-    useRunTracker();
+  const {
+    isTracking,
+    path,
+    startTracking,
+    stopTracking,
+    currentLocation,
+    startTime,
+  } = useRunTracker();
+
+  const distance = useMemo(() => calculateDistance(path), [path]);
+
+  // Update run in background
+  useEffect(() => {
+    if (!isTracking || !currentRouteId || path.length === 0) return;
+
+    // Update every 10 points to avoid too many requests
+    if (path.length % 10 === 0) {
+      updateRun(currentRouteId, {
+        path: path,
+      }).catch((err) => {
+        console.error("Failed to update run:", err);
+      });
+    }
+  }, [path, isTracking, currentRouteId]);
+
+  const handleStartRun = async () => {
+    const initialLocation = await startTracking();
+
+    if (initialLocation) {
+      try {
+        const run = await createRun({
+          startedAt: new Date(
+            initialLocation.timestamp || Date.now(),
+          ).toISOString(),
+          path: [initialLocation],
+        });
+        setCurrentRouteId(run.id);
+      } catch (err) {
+        console.error("Failed to create run in Supabase:", err);
+        // If we failed to create the run, we should probably stop tracking
+        stopTracking();
+      }
+    }
+  };
+
+  const handleStopRun = async () => {
+    await stopTracking();
+
+    if (currentRouteId && startTime) {
+      try {
+        const endTime = Date.now();
+        const duration = Math.floor((endTime - startTime) / 1000); // in seconds
+
+        await completeRun(currentRouteId, {
+          endedAt: new Date(endTime).toISOString(),
+          duration,
+          distance,
+        });
+
+        // Ensure final path is saved
+        await updateRun(currentRouteId, {
+          path: path,
+        });
+      } catch (err) {
+        console.error("Failed to complete run:", err);
+      }
+
+      setCurrentRouteId(null);
+    }
+  };
 
   const handleRecenter = useCallback(() => {
     const target = currentLocation || location;
@@ -72,6 +149,7 @@ export default function RunScreen() {
             if (following) setFollowing(false);
           }}
           onRegionChangeComplete={(region) => {
+            // Only update ref, don't trigger re-render
             if (cameraRef.current) {
               cameraRef.current.center.latitude = region.latitude;
               cameraRef.current.center.longitude = region.longitude;
@@ -88,6 +166,28 @@ export default function RunScreen() {
           )}
         </Map>
 
+        {/* Info Overlay */}
+        {isTracking && (
+          <View className="absolute top-4 left-4 right-4 bg-white/90 p-4 rounded-xl shadow-sm flex-row justify-between">
+            <View>
+              <Text className="text-gray-500 text-xs uppercase font-bold">
+                Distância
+              </Text>
+              <Text className="text-xl font-bold">
+                {(distance / 1000).toFixed(2)}{" "}
+                <Text className="text-sm font-normal">km</Text>
+              </Text>
+            </View>
+            <View>
+              <Text className="text-gray-500 text-xs uppercase font-bold">
+                Tempo
+              </Text>
+              {/* Simple timer display could be added here later */}
+              <Text className="text-xl font-bold">Running...</Text>
+            </View>
+          </View>
+        )}
+
         {/* Recenter Button */}
         {!following && (currentLocation || location) && (
           <View className="absolute bottom-4 right-4">
@@ -95,9 +195,9 @@ export default function RunScreen() {
           </View>
         )}
       </View>
-      <View className="p-4 bg-white">
+      <View className="p-4 bg-white safe-area-bottom">
         <Button
-          onPress={isTracking ? stopTracking : startTracking}
+          onPress={isTracking ? handleStopRun : handleStartRun}
           className={clsx({ "bg-red-500 hover:bg-red-600": isTracking })}
           disabled={loadingInitialLocation}
         >
