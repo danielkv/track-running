@@ -6,7 +6,9 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "gpx-to-route": "ts-node scripts/gpx-to-route.ts",
+    "import-gpx": "ts-node scripts/import-gpx.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -49,7 +51,9 @@
   "devDependencies": {
     "@types/connect": "^3",
     "@types/react": "~19.1.0",
+    "dotenv": "^17.2.3",
     "react-test-renderer": "19.1.0",
+    "ts-node": "^10.9.2",
     "type-fest": "^5.4.3",
     "typescript": "~5.9.2"
   },

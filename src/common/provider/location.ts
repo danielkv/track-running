@@ -1,3 +1,4 @@
+import { Coordinate } from "@/src/types/common";
 import { calculateDistance, resamplePath } from "@/src/utils/geo";
 import * as Location from "expo-location";
 
@@ -68,7 +69,11 @@ export const LocationProvider: typeof Location = {
 async function simulateWatchPosition(callback: Callback, paceMinPerKm = pace) {
   let index = 0;
   
-  const originalPath = route.map(([latitude, longitude]) => ({ latitude, longitude }));
+  const originalPath: Coordinate[] = route.map(([latitude, longitude]) => ({ 
+    latitude, 
+    longitude, 
+    timestamp: Date.now() 
+  }));
   const distance = calculateDistance(originalPath);
   
   // Calculate total duration in seconds based on pace

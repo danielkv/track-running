@@ -1,27 +1,19 @@
+import { LocationSplashScreen } from "@/src/components/LocationSplashScreen";
 import { Tabs } from "expo-router";
+import { useState } from "react";
 import { View } from "react-native";
 
 export default function TabLayout() {
+  const [isReady, setIsReady] = useState(false);
+
+  if (!isReady) {
+    return <LocationSplashScreen onReady={() => setIsReady(true)} />;
+  }
+
   return (
     <Tabs
       screenOptions={{ tabBarActiveTintColor: "#3b82f6", headerShown: false }}
     >
-      <Tabs.Screen
-        name="map"
-        options={{
-          title: "Map",
-          tabBarIcon: ({ color }) => (
-            <View
-              style={{
-                width: 24,
-                height: 24,
-                backgroundColor: color,
-                borderRadius: 12,
-              }}
-            />
-          ), // Placeholder icon
-        }}
-      />
       <Tabs.Screen
         name="run"
         options={{
@@ -70,7 +62,6 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen name="index" options={{ href: null }} />
     </Tabs>
   );
 }

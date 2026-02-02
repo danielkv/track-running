@@ -1,7 +1,9 @@
 export type Coordinate = {
   latitude: number;
   longitude: number;
-  timestamp?: number;
+  timestamp: number;
+  elevation?: number;
+  speed?: number;
 };
 
 export type RunStatus = 'active' | 'completed' | 'paused' | 'cancelled';

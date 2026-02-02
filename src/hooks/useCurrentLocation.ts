@@ -36,6 +36,8 @@ export function useCurrentLocation() {
         latitude: currentLocation.coords.latitude,
         longitude: currentLocation.coords.longitude,
         timestamp: currentLocation.timestamp,
+        elevation: currentLocation.coords.altitude || undefined,
+        speed: currentLocation.coords.speed || undefined,
       };
 
       setLocation(coord);

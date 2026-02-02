@@ -1,14 +1,14 @@
-import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
-import { useAuth } from '../hooks/useAuth';
-import { router } from 'expo-router';
-import { useEffect } from 'react';
+import { router } from "expo-router";
+import { useEffect } from "react";
+import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { useAuth } from "../hooks/useAuth";
 
 export default function LoginScreen() {
   const { signInWithGoogle, loading, isAuthenticated } = useAuth();
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace('/(tabs)/map');
+      router.replace("/(tabs)/run");
     }
   }, [isAuthenticated]);
 
@@ -17,8 +17,8 @@ export default function LoginScreen() {
 
     if (error) {
       Alert.alert(
-        'Erro ao fazer login',
-        'Não foi possível fazer login com o Google. Tente novamente.'
+        "Erro ao fazer login",
+        "Não foi possível fazer login com o Google. Tente novamente.",
       );
     }
   };
@@ -39,7 +39,7 @@ export default function LoginScreen() {
           onPress={handleGoogleLogin}
           disabled={loading}
           className={`w-full bg-white border-2 border-gray-300 rounded-xl py-4 px-6 flex-row items-center justify-center shadow-sm ${
-            loading ? 'opacity-50' : 'active:bg-gray-50'
+            loading ? "opacity-50" : "active:bg-gray-50"
           }`}
         >
           {loading ? (
@@ -58,7 +58,8 @@ export default function LoginScreen() {
         </Pressable>
 
         <Text className="text-xs text-center mt-8 text-gray-500">
-          Ao continuar, você concorda com nossos Termos de Serviço e Política de Privacidade
+          Ao continuar, você concorda com nossos Termos de Serviço e Política de
+          Privacidade
         </Text>
       </View>
     </View>

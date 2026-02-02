@@ -1,5 +1,9 @@
 import { supabase } from '../lib/supabase';
-import { Coordinate, Run, RunStatus } from '../types/Run';
+import { Coordinate, Route, Run, RunStatus } from '../types/Run';
+import { validateRunPace } from './verification';
+// ... (keep existing imports)
+
+// ... (keep existing code)
 
 /**
  * Create a new run
@@ -132,8 +136,14 @@ export async function completeRun(
     duration: number;
     distance: number;
     territoryIds?: string[];
+    routeId?: string; // Route being run (for competition context)
   }
 ): Promise<Run> {
+  const { valid, reason } = validateRunPace(finalData.duration, finalData.distance);
+  if (!valid) {
+    throw new Error(`Run rejected: ${reason}`);
+  }
+
   // Map camelCase to snake_case for the update
   const updates: any = {
     ended_at: finalData.endedAt,
@@ -146,5 +156,84 @@ export async function completeRun(
     updates.territory_ids = finalData.territoryIds;
   }
 
-  return updateRun(id, updates);
+  const run = await updateRun(id, updates);
+
+  // Handle Competition Logic
+  // If this run belongs to a route, check if it beats the record
+  if (finalData.routeId) {
+    await checkAndUpdateRouteRecord(finalData.routeId, run);
+  }
+
+  return run;
+}
+
+/**
+ * Checks if a run beats the current route record and updates it if so.
+ */
+async function checkAndUpdateRouteRecord(routeId: string, run: Run): Promise<void> {
+  try {
+    const { data: route, error } = await supabase
+      .from('routes')
+      .select('best_run_id, owner_id')
+      .eq('id', routeId)
+      .single();
+
+    if (error || !route) return;
+
+    let isNewRecord = false;
+
+    if (!route.best_run_id) {
+      isNewRecord = true;
+    } else {
+      const { data: bestRun } = await supabase
+        .from('runs')
+        .select('duration')
+        .eq('id', route.best_run_id)
+        .single();
+      
+      // If previous best run not found or current run is faster (lower duration)
+      if (!bestRun || (run.duration !== null && bestRun.duration !== null && run.duration < bestRun.duration)) {
+        isNewRecord = true;
+      }
+    }
+
+    if (isNewRecord) {
+      await supabase
+        .from('routes')
+        .update({
+          owner_id: run.user_id,
+          best_run_id: run.id
+        })
+        .eq('id', routeId);
+    }
+  } catch (err) {
+    console.warn('Failed to update route record:', err);
+    // Don't fail the run completion if this fails
+  }
+}
+
+/**
+ * Get routes within a specific region.
+ * Currently fetches ALL routes as per user request for MVP.
+ */
+export async function getRoutesInRegion(region: {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+}): Promise<Route[]> {
+  // TODO: Implement actual spatial filtering using PostGIS or client-side bounding box check if needed later.
+  // For now, simple fetch of recent routes.
+  
+  const { data: routes, error } = await supabase
+    .from('routes')
+    .select('*')
+    .limit(50); // Limit to avoid overwhelming map
+
+  if (error) {
+    console.error('Error fetching routes:', error);
+    return [];
+  }
+  
+  return routes || [];
 }

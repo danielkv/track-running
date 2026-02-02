@@ -37,6 +37,8 @@ export function useRunTracker() {
         latitude: initialLocation.coords.latitude,
         longitude: initialLocation.coords.longitude,
         timestamp: initialLocation.timestamp,
+        elevation: initialLocation.coords.altitude || undefined,
+        speed: initialLocation.coords.speed || undefined,
       };
       
       setCurrentLocation(initialCoord);
@@ -54,6 +56,8 @@ export function useRunTracker() {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
             timestamp: location.timestamp,
+            elevation: location.coords.altitude || undefined,
+            speed: location.coords.speed || undefined,
           };
 
           const newPath = [...pathRef.current, coord];

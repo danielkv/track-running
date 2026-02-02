@@ -1,6 +1,6 @@
 import { Redirect } from "expo-router";
+import { ActivityIndicator, View } from "react-native";
 import { useAuth } from "../hooks/useAuth";
-import { View, ActivityIndicator } from "react-native";
 
 export default function Index() {
   const { isAuthenticated, loading } = useAuth();
@@ -14,7 +14,7 @@ export default function Index() {
   }
 
   if (isAuthenticated) {
-    return <Redirect href="/(tabs)/map" />;
+    return <Redirect href="/(tabs)/run" />;
   }
 
   return <Redirect href="/login" />;

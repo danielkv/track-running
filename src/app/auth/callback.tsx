@@ -1,12 +1,12 @@
-import { useEffect } from 'react';
-import { View, ActivityIndicator, Text } from 'react-native';
-import { router } from 'expo-router';
+import { router } from "expo-router";
+import { useEffect } from "react";
+import { ActivityIndicator, Text, View } from "react-native";
 
 export default function AuthCallback() {
   useEffect(() => {
     // O WebBrowser já lidou com a sessão, apenas redireciona
     const timer = setTimeout(() => {
-      router.replace('/(tabs)/map');
+      router.replace("/(tabs)/run");
     }, 500);
 
     return () => clearTimeout(timer);

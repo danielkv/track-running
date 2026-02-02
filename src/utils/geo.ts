@@ -76,8 +76,66 @@ export const resamplePath = (path: Coordinate[], numPoints: number): Coordinate[
     newPath.push({
       latitude: p1.latitude + (p2.latitude - p1.latitude) * fraction,
       longitude: p1.longitude + (p2.longitude - p1.longitude) * fraction,
+      timestamp: p1.timestamp + (p2.timestamp - p1.timestamp) * fraction,
     });
   }
 
   return newPath;
 };
+
+/**
+ * Calculates the minimum distance from a point to a path (segment by segment).
+ */
+export const distanceToPath = (point: Coordinate, path: Coordinate[]): number => {
+  if (path.length < 2) return calculateDistance([point, path[0]]);
+
+  let minDistance = Number.MAX_VALUE;
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const p1 = path[i];
+    const p2 = path[i + 1];
+    const dist = distanceToSegment(point, p1, p2);
+    if (dist < minDistance) {
+      minDistance = dist;
+    }
+  }
+
+  return minDistance;
+};
+
+/**
+ * Helper to calculate distance from point p to segment v-w
+ */
+function distanceToSegment(p: Coordinate, v: Coordinate, w: Coordinate): number {
+  const l2 = distanceSquared(v, w);
+  if (l2 === 0) return calculateDistance([p, v]);
+
+  // Convert to Cartesian approximation for projection ratio t
+  // (Not 100% accurate for lat/lon but good enough for small segments)
+  // For better accuracy we should project on sphere, but given the segments are short:
+  
+  // Let's use simple flat-earth approximation for the projection factor 't'
+  // Then use Haversine for the final distance
+  
+  const x = p.longitude;
+  const y = p.latitude;
+  const x1 = v.longitude;
+  const y1 = v.latitude;
+  const x2 = w.longitude;
+  const y2 = w.latitude;
+
+  let t = ((x - x1) * (x2 - x1) + (y - y1) * (y2 - y1)) / ((x2 - x1) ** 2 + (y2 - y1) ** 2);
+  t = Math.max(0, Math.min(1, t));
+  
+  const projection: Coordinate = {
+    latitude: y1 + t * (y2 - y1),
+    longitude: x1 + t * (x2 - x1),
+    timestamp: 0 // dummy
+  };
+
+  return calculateDistance([p, projection]);
+}
+
+function distanceSquared(v: Coordinate, w: Coordinate): number {
+  return (v.latitude - w.latitude) ** 2 + (v.longitude - w.longitude) ** 2;
+}

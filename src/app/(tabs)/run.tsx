@@ -1,11 +1,21 @@
 import { Button } from "@/src/components/Button";
 import { Map } from "@/src/components/features/Map";
+import { RouteDetail } from "@/src/components/run/RouteDetail";
+import { RouteList } from "@/src/components/run/RouteList";
+import { RunControls } from "@/src/components/run/RunControls";
 import { Text } from "@/src/components/Themed";
 import { useCurrentLocation } from "@/src/hooks/useCurrentLocation";
 import { useRunTracker } from "@/src/hooks/useRunTracker";
-import { completeRun, createRun, updateRun } from "@/src/services/routes";
+import {
+  completeRun,
+  createRun,
+  getRoutesInRegion,
+  updateRun,
+} from "@/src/services/routes";
+import { checkProximityToStart, isOnRoute } from "@/src/services/verification";
+import { Route } from "@/src/types/Run";
 import { calculateDistance } from "@/src/utils/geo";
-import clsx from "clsx";
+import { useQuery } from "@tanstack/react-query";
 import React, {
   useCallback,
   useEffect,
@@ -14,7 +24,7 @@ import React, {
   useState,
 } from "react";
 import { View } from "react-native";
-import MapView, { Camera, Marker, Polyline } from "react-native-maps";
+import MapView, { Marker, Polyline } from "react-native-maps";
 
 const ANIMATION_DURATION = 1000;
 
@@ -24,15 +34,15 @@ export default function RunScreen() {
   const [isMapReady, setIsMapReady] = useState(false);
   const [currentRouteId, setCurrentRouteId] = useState<string | null>(null);
 
-  // Track current region in a ref to avoid re-renders and stale closures
-  const cameraRef = useRef<Camera>({
-    center: {
-      latitude: -29.107952,
-      longitude: -49.6372042,
-    },
-    heading: 0,
-    pitch: 0,
-    zoom: 8,
+  // Routes management
+  const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
+  const [offRouteWarning, setOffRouteWarning] = useState(false);
+
+  const [currentRegion, setCurrentRegion] = useState({
+    latitude: -29.107952,
+    longitude: -49.6372042,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
   });
 
   const { location, loading: loadingInitialLocation } = useCurrentLocation();
@@ -47,22 +57,39 @@ export default function RunScreen() {
 
   const distance = useMemo(() => calculateDistance(path), [path]);
 
+  // Derived View Mode
+  const viewMode = isTracking
+    ? "RUNNING"
+    : selectedRoute
+      ? "SELECTED"
+      : "EXPLORING";
+
+  // Use React Query for fetching routes.
+  const { data: nearbyRoutes = [] } = useQuery({
+    queryKey: ["routes", currentRegion],
+    queryFn: async () => {
+      // Fetch routes with enhanced error handling and timeout if needed
+      return getRoutesInRegion(currentRegion);
+    },
+    // Only fetch when map is ready and we are exploring
+    // This prevents refetching while running or viewing details
+    enabled: isMapReady && viewMode === "EXPLORING",
+  });
+
   // Follow user location when following is enabled
   useEffect(() => {
     if (!following || !isMapReady) return;
 
     const target = currentLocation || location;
     if (target) {
-      mapRef.current?.animateCamera(
+      mapRef.current?.animateToRegion(
         {
-          center: {
-            latitude: target.latitude,
-            longitude: target.longitude,
-          },
+          latitude: target.latitude,
+          longitude: target.longitude,
+          latitudeDelta: currentRegion.latitudeDelta,
+          longitudeDelta: currentRegion.longitudeDelta,
         },
-        {
-          duration: 300,
-        }
+        300,
       );
     }
   }, [currentLocation, location, following, isMapReady]);
@@ -70,6 +97,12 @@ export default function RunScreen() {
   // Update run in background
   useEffect(() => {
     if (!isTracking || !currentRouteId || path.length === 0) return;
+
+    // Check if on route
+    if (selectedRoute && selectedRoute.path && currentLocation) {
+      const isSafe = isOnRoute(currentLocation, selectedRoute.path);
+      setOffRouteWarning(!isSafe);
+    }
 
     // Update every 10 points to avoid too many requests
     if (path.length % 10 === 0) {
@@ -79,12 +112,44 @@ export default function RunScreen() {
         console.error("Failed to update run:", err);
       });
     }
-  }, [path, isTracking, currentRouteId]);
+  }, [path, isTracking, currentRouteId, currentLocation, selectedRoute]);
+
+  const handleSelectRoute = (route: Route) => {
+    setSelectedRoute(route);
+    setFollowing(false);
+
+    // Zoom to route
+    if (route.path && route.path.length > 0) {
+      // fitToCoordinates creates a nice zoomed view of the route
+      mapRef.current?.fitToCoordinates(route.path, {
+        edgePadding: { top: 50, right: 50, bottom: 300, left: 50 }, // Bottom padding for detail sheet
+        animated: true,
+      });
+    }
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedRoute(null);
+    // When closing, we could recenter on user or just leave map as is
+    // Let's leave it as is, user can recenter if they want
+  };
 
   const handleStartRun = async () => {
     const initialLocation = await startTracking();
 
     if (initialLocation) {
+      if (selectedRoute && selectedRoute.path) {
+        const isClose = checkProximityToStart(
+          initialLocation,
+          selectedRoute.path,
+        );
+        if (!isClose) {
+          alert("Você está muito longe do início da rota!");
+          stopTracking();
+          return;
+        }
+      }
+
       try {
         const run = await createRun({
           startedAt: new Date(
@@ -95,7 +160,6 @@ export default function RunScreen() {
         setCurrentRouteId(run.id);
       } catch (err) {
         console.error("Failed to create run in Supabase:", err);
-        // If we failed to create the run, we should probably stop tracking
         stopTracking();
       }
     }
@@ -113,6 +177,8 @@ export default function RunScreen() {
           endedAt: new Date(endTime).toISOString(),
           duration,
           distance,
+          routeId: selectedRoute?.id,
+          territoryIds: [], // Placeholder
         });
 
         // Ensure final path is saved
@@ -124,29 +190,35 @@ export default function RunScreen() {
       }
 
       setCurrentRouteId(null);
+      setSelectedRoute(null);
+      // setViewMode will naturally go back to EXPLORING
     }
   };
 
   const handleRecenter = useCallback(() => {
     const target = currentLocation || location;
     if (target) {
-      mapRef.current?.animateCamera(
+      mapRef.current?.animateToRegion(
         {
-          center: {
-            latitude: target.latitude,
-            longitude: target.longitude,
-          },
+          latitude: target.latitude,
+          longitude: target.longitude,
+          latitudeDelta: currentRegion.latitudeDelta,
+          longitudeDelta: currentRegion.longitudeDelta,
         },
-        {
-          duration: ANIMATION_DURATION,
-        },
+        ANIMATION_DURATION,
       );
 
       setTimeout(() => {
         setFollowing(true);
       }, ANIMATION_DURATION);
     }
-  }, [mapRef, location, currentLocation]);
+  }, [
+    mapRef,
+    location,
+    currentLocation,
+    currentRegion.latitudeDelta,
+    currentRegion.longitudeDelta,
+  ]);
 
   if (!location) {
     return (
@@ -161,26 +233,45 @@ export default function RunScreen() {
       <View className="flex-1">
         <Map
           ref={mapRef}
-          showsMyLocationButton
+          showsMyLocationButton={false} // Custom button used
           onMapReady={() => setIsMapReady(true)}
           onPanDrag={() => {
             if (following) setFollowing(false);
           }}
           onRegionChangeComplete={(region) => {
-            // Only update ref, don't trigger re-render
-            if (cameraRef.current) {
-              cameraRef.current = {
-                ...cameraRef.current,
-                center: {
-                  latitude: region.latitude,
-                  longitude: region.longitude,
-                },
-              };
-            }
+            setCurrentRegion({
+              latitude: region.latitude,
+              longitude: region.longitude,
+              latitudeDelta: region.latitudeDelta,
+              longitudeDelta: region.longitudeDelta,
+            });
           }}
-          initialCamera={cameraRef.current}
+          initialRegion={currentRegion}
         >
-          {/* User location marker using LocationProvider */}
+          {/* Nearby Routes (Exploring Mode) */}
+          {viewMode === "EXPLORING" &&
+            nearbyRoutes.map((route) => (
+              <Polyline
+                key={route.id}
+                coordinates={route.path || []}
+                strokeColor="#94a3b8" // gray-400
+                strokeWidth={4}
+                tappable
+                onPress={() => handleSelectRoute(route)}
+              />
+            ))}
+
+          {/* Selected Route (Selected/Running Mode) */}
+          {(viewMode === "SELECTED" || viewMode === "RUNNING") &&
+            selectedRoute && (
+              <Polyline
+                coordinates={selectedRoute.path || []}
+                strokeColor="#3b82f6" // blue-500
+                strokeWidth={4}
+              />
+            )}
+
+          {/* User location marker */}
           {(currentLocation || location) && (
             <Marker
               coordinate={currentLocation || location}
@@ -191,6 +282,7 @@ export default function RunScreen() {
             </Marker>
           )}
 
+          {/* Run Path */}
           {path.length > 2 && (
             <Polyline
               coordinates={path}
@@ -200,44 +292,46 @@ export default function RunScreen() {
           )}
         </Map>
 
-        {/* Info Overlay */}
-        {isTracking && (
-          <View className="absolute top-4 left-4 right-4 bg-white/90 p-4 rounded-xl shadow-sm flex-row justify-between">
-            <View>
-              <Text className="text-gray-500 text-xs uppercase font-bold">
-                Distância
-              </Text>
-              <Text className="text-xl font-bold">
-                {(distance / 1000).toFixed(2)}{" "}
-                <Text className="text-sm font-normal">km</Text>
-              </Text>
-            </View>
-            <View>
-              <Text className="text-gray-500 text-xs uppercase font-bold">
-                Tempo
-              </Text>
-              {/* Simple timer display could be added here later */}
-              <Text className="text-xl font-bold">Running...</Text>
-            </View>
-          </View>
+        {/* UI Overlays based on state */}
+        {viewMode === "EXPLORING" && (
+          <RouteList routes={nearbyRoutes} onSelectRoute={handleSelectRoute} />
         )}
 
-        {/* Recenter Button */}
+        {viewMode === "SELECTED" && selectedRoute && (
+          <RouteDetail
+            route={selectedRoute}
+            onStartRun={handleStartRun}
+            onClose={handleCloseDetail}
+          />
+        )}
+
+        {viewMode === "RUNNING" && (
+          <RunControls
+            distance={distance}
+            onStopRun={handleStopRun}
+            currentSpeed={currentLocation?.speed}
+            elevation={currentLocation?.elevation}
+          />
+        )}
+
+        {/* Recenter Button (only show if not following and map is interactable) */}
         {!following && (currentLocation || location) && (
-          <View className="absolute bottom-4 right-4">
-            <Button onPress={handleRecenter}>Recentralizar</Button>
+          <View className="absolute top-16 right-4 z-50">
+            <Button onPress={handleRecenter} size="sm" variant="secondary">
+              Recentralizar
+            </Button>
           </View>
         )}
       </View>
-      <View className="p-4 bg-white safe-area-bottom">
-        <Button
-          onPress={isTracking ? handleStopRun : handleStartRun}
-          className={clsx({ "bg-red-500 hover:bg-red-600": isTracking })}
-          disabled={loadingInitialLocation}
-        >
-          {isTracking ? "Terminar corrida" : "Iniciar corrida"}
-        </Button>
-      </View>
+
+      {/* Off Route Warning */}
+      {offRouteWarning && (
+        <View className="absolute bottom-32 left-4 right-4 bg-red-500 p-3 rounded-lg shadow-lg items-center z-50">
+          <Text className="text-white font-bold text-center uppercase">
+            ⚠️ Fora da rota!
+          </Text>
+        </View>
+      )}
     </View>
   );
 }

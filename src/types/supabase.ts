@@ -45,6 +45,7 @@ export type Database = {
           path: Json
           total_distance: number | null
           updated_at: string
+          best_run_id: string | null
         }
         Insert: {
           created_at?: string
@@ -56,6 +57,7 @@ export type Database = {
           path?: Json
           total_distance?: number | null
           updated_at?: string
+          best_run_id?: string | null
         }
         Update: {
           created_at?: string
@@ -67,8 +69,17 @@ export type Database = {
           path?: Json
           total_distance?: number | null
           updated_at?: string
+          best_run_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "routes_best_run_id_fkey"
+            columns: ["best_run_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       runs: {
         Row: {
